@@ -50,15 +50,22 @@ async def get_post_or_404(db: AsyncSession, post_id: int) -> Post:
 async def create_post_page(
     request: Request,
     current_user: Annotated[User, Depends(get_current_user)],
+    next: str | None = None,
 ):
+    safe_next = get_safe_next(next)
     return templates.TemplateResponse(
         "create_post.html",
         {
             "request": request,
-            "user": current_user,
+            "current_user": current_user,
             "errors": {},
             "content": "",
+            "next": safe_next,
+            "published": False,
+            "redirect_url": safe_next or f"/users/{current_user.username}",
             "title": "Создание поста",
+            "show_post_back": True,
+            "post_back_href": safe_next or f"/users/{current_user.username}",
         },
     )
 
@@ -69,7 +76,9 @@ async def create_post(
     db: Annotated[AsyncSession, Depends(get_db)],
     current_user: Annotated[User, Depends(get_current_user)],
     content: Annotated[str, Form()],
+    next: Annotated[str | None, Form()] = None,
 ):
+    safe_next = get_safe_next(next)
     try:
         post_data = PostCreate(content=content)
     except ValidationError as error:
@@ -77,9 +86,15 @@ async def create_post(
             "create_post.html",
             {
                 "request": request,
-                "user": current_user,
+                "current_user": current_user,
                 "errors": {"content": get_first_validation_message(error)},
                 "content": content,
+                "next": safe_next,
+                "published": False,
+                "redirect_url": safe_next or f"/users/{current_user.username}",
+                "title": "Создание поста",
+                "show_post_back": True,
+                "post_back_href": safe_next or f"/users/{current_user.username}",
             },
             status_code=status.HTTP_400_BAD_REQUEST,
         )
@@ -92,7 +107,21 @@ async def create_post(
     db.add(post)
     await db.commit()
 
-    return RedirectResponse(f"/users/{current_user.username}", status_code=status.HTTP_303_SEE_OTHER)
+    return templates.TemplateResponse(
+        "create_post.html",
+        {
+            "request": request,
+            "current_user": current_user,
+            "errors": {},
+            "content": post_data.content,
+            "next": safe_next,
+            "published": True,
+            "redirect_url": safe_next or f"/users/{current_user.username}",
+            "title": "Пост опубликован",
+            "show_post_back": True,
+            "post_back_href": safe_next or f"/users/{current_user.username}",
+        },
+    )
 
 
 @router.get("/{post_id}/edit")

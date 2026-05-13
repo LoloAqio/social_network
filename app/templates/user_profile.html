@@ -91,7 +91,7 @@
     <div class="flex items-center justify-between">
         <h2 class="text-lg font-bold">{{ "Мои посты" if is_own_profile else "Посты" }}</h2>
         {% if is_own_profile %}
-        <a href="/posts/create" class="rounded-full bg-sky-500 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-600">Новый пост</a>
+        <a href="/posts/create?next={{ request.url.path }}" class="rounded-full bg-sky-500 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-600" data-post-return-link="true">Новый пост</a>
         {% endif %}
     </div>
 

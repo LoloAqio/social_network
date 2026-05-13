@@ -30,7 +30,7 @@
                     <a href="/search" class="block rounded-full px-4 py-2 text-slate-800 hover:bg-slate-100">Поиск</a>
                     {% if nav_user %}
                     <a href="/profile" class="block rounded-full px-4 py-2 text-slate-800 hover:bg-slate-100" data-profile-link="true">Профиль</a>
-                    <a href="/posts/create" class="block rounded-full bg-sky-500 px-4 py-2 text-center text-white hover:bg-sky-600">Новый пост</a>
+                    <a href="/posts/create?next={{ request.url.path }}" class="block rounded-full bg-sky-500 px-4 py-2 text-center text-white hover:bg-sky-600" data-post-return-link="true">Новый пост</a>
                     {% else %}
                     <a href="/login" class="block rounded-full px-4 py-2 text-slate-800 hover:bg-slate-100">Вход</a>
                     <a href="/register" class="block rounded-full bg-sky-500 px-4 py-2 text-center text-white hover:bg-sky-600">Регистрация</a>
