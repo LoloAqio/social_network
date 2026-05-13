@@ -79,6 +79,38 @@
         let debounceTimer = null;
         let controller = null;
         let requestNumber = 0;
+        const searchCursorKey = "search-cursor-position";
+        const searchValueKey = "search-cursor-value";
+
+        const saveCursorPosition = () => {
+            sessionStorage.setItem(searchValueKey, input.value);
+            sessionStorage.setItem(searchCursorKey, JSON.stringify({
+                start: input.selectionStart ?? input.value.length,
+                end: input.selectionEnd ?? input.value.length,
+            }));
+        };
+
+        const restoreCursorPosition = () => {
+            const savedValue = sessionStorage.getItem(searchValueKey);
+            const savedPosition = sessionStorage.getItem(searchCursorKey);
+
+            sessionStorage.removeItem(searchValueKey);
+            sessionStorage.removeItem(searchCursorKey);
+
+            if (savedValue !== input.value || !savedPosition) {
+                return;
+            }
+
+            try {
+                const position = JSON.parse(savedPosition);
+                const start = Math.min(Number(position.start), input.value.length);
+                const end = Math.min(Number(position.end), input.value.length);
+                input.focus();
+                input.setSelectionRange(start, end);
+            } catch (error) {
+                input.focus();
+            }
+        };
 
         const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (char) => ({
             "&": "&amp;",
@@ -207,10 +239,24 @@
                 });
             } catch (error) {
                 if (error.name !== "AbortError") {
+                    saveCursorPosition();
                     form.submit();
                 }
             }
         };
+
+        restoreCursorPosition();
+
+        form.addEventListener("submit", () => {
+            saveCursorPosition();
+        });
+
+        document.addEventListener("click", (event) => {
+            const profileLink = event.target.closest("[data-profile-link]");
+            if (profileLink) {
+                saveCursorPosition();
+            }
+        });
 
         input.addEventListener("input", () => {
             window.clearTimeout(debounceTimer);
