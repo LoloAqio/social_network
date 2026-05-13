@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% set input_class = "w-full rounded-full border border-slate-300 px-4 py-2 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100" %}
+{% set error_class = "mt-1 text-sm font-semibold text-red-600" %}
+{% set hint_class = "mt-1 text-xs text-slate-500" %}
+
+<form method="post" action="/register" class="space-y-4" id="register-form" novalidate>
+    {% if next %}
+    <input type="hidden" name="next" value="{{ next }}">
+    {% endif %}
+    <label class="block">
+        <span class="mb-2 block text-sm font-semibold text-slate-700">Username</span>
+        <input id="username-input" class="{{ input_class }} {% if errors.username %}border-red-300 focus:border-red-500 focus:ring-red-100{% endif %}" type="text" name="username" value="{{ form_data.username or '' }}" required minlength="3" maxlength="50" autocomplete="username">
+        <p class="{{ hint_class }}">Минимум 3 символа, без пробелов.</p>
+        <p id="username-status" class="{% if errors.username %}{{ error_class }}{% else %}mt-1 text-sm font-semibold{% endif %}">{{ errors.username or "" }}</p>
+    </label>
+    <label class="block">
+        <span class="mb-2 block text-sm font-semibold text-slate-700">Email</span>
+        <input class="{{ input_class }} {% if errors.email %}border-red-300 focus:border-red-500 focus:ring-red-100{% endif %}" type="email" name="email" value="{{ form_data.email or '' }}" required maxlength="255" pattern="^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$" autocomplete="email">
+        <p class="{{ hint_class }}">Формат: name@example.com.</p>
+        {% if errors.email %}<p class="{{ error_class }}">{{ errors.email }}</p>{% endif %}
+    </label>
+    <label class="block">
+        <span class="mb-2 block text-sm font-semibold text-slate-700">Пароль</span>
+        <input class="{{ input_class }} {% if errors.password %}border-red-300 focus:border-red-500 focus:ring-red-100{% endif %}" type="password" name="password" required minlength="8" autocomplete="new-password">
+        <p class="{{ hint_class }}">Минимум 8 символов.</p>
+        {% if errors.password %}<p class="{{ error_class }}">{{ errors.password }}</p>{% endif %}
+    </label>
+    <label class="block">
+        <span class="mb-2 block text-sm font-semibold text-slate-700">Имя <span class="font-normal text-slate-500">(необязательно)</span></span>
+        <input class="{{ input_class }} {% if errors.first_name %}border-red-300 focus:border-red-500 focus:ring-red-100{% endif %}" type="text" name="first_name" value="{{ form_data.first_name or '' }}" maxlength="100">
+        <p class="{{ hint_class }}">Можно оставить пустым.</p>
+        {% if errors.first_name %}<p class="{{ error_class }}">{{ errors.first_name }}</p>{% endif %}
+    </label>
+    <label class="block">
+        <span class="mb-2 block text-sm font-semibold text-slate-700">Фамилия <span class="font-normal text-slate-500">(необязательно)</span></span>
+        <input class="{{ input_class }} {% if errors.last_name %}border-red-300 focus:border-red-500 focus:ring-red-100{% endif %}" type="text" name="last_name" value="{{ form_data.last_name or '' }}" maxlength="100">
+        <p class="{{ hint_class }}">Можно оставить пустым.</p>
+        {% if errors.last_name %}<p class="{{ error_class }}">{{ errors.last_name }}</p>{% endif %}
+    </label>
+    <button id="register-submit" class="rounded-full bg-sky-500 px-5 py-2 font-semibold text-white hover:bg-sky-600 disabled:cursor-not-allowed disabled:bg-slate-300" type="submit">Зарегистрироваться</button>
+</form>
+
+<p class="mt-5 text-sm text-slate-600">Уже есть аккаунт? <a class="font-semibold text-sky-600 hover:underline" href="/login{% if next %}?next={{ next }}{% endif %}">Войти</a></p>
+
+<script>
+    const usernameInput = document.querySelector("#username-input");
+    const usernameStatus = document.querySelector("#username-status");
+    const submitButton = document.querySelector("#register-submit");
+    let usernameTimer;
+
+    function setUsernameStatus(message, className, disableSubmit) {
+        usernameStatus.textContent = message;
+        usernameStatus.className = className;
+        submitButton.disabled = disableSubmit;
+    }
+
+    usernameInput.addEventListener("input", () => {
+        clearTimeout(usernameTimer);
+        const username = usernameInput.value.trim();
+
+        if (!username) {
+            setUsernameStatus("", "mt-1 text-sm font-semibold", false);
+            return;
+        }
+
+        if (username.length < 3) {
+            setUsernameStatus("Username должен содержать минимум 3 символа", "mt-1 text-sm font-semibold text-red-600", true);
+            return;
+        }
+
+        if (username.includes(" ")) {
+            setUsernameStatus("Username не должен содержать пробелы", "mt-1 text-sm font-semibold text-red-600", true);
+            return;
+        }
+
+        setUsernameStatus("Проверяем username...", "mt-1 text-sm font-semibold text-slate-500", true);
+
+        usernameTimer = setTimeout(async () => {
+            const response = await fetch(`/register/check-username?username=${encodeURIComponent(username)}`);
+            const result = await response.json();
+
+            if (result.available) {
+                setUsernameStatus(result.message, "mt-1 text-sm font-semibold text-emerald-600", false);
+            } else {
+                setUsernameStatus(result.message, "mt-1 text-sm font-semibold text-red-600", true);
+            }
+        }, 350);
+    });
+</script>
+{% endblock %}

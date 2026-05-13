@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% set post_text = content if content is defined else post.content %}
+{% set textarea_class = "min-h-36 w-full resize-y rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100" %}
+
+<form method="post" action="/posts/{{ post.id }}/edit" class="space-y-4" data-post-form="true" novalidate>
+    {% if next %}
+    <input type="hidden" name="next" value="{{ next }}">
+    {% endif %}
+    <label class="block">
+        <span class="mb-2 block text-sm font-semibold text-slate-700">Текст поста</span>
+        <textarea class="{{ textarea_class }} {% if errors.content %}border-red-300 focus:border-red-500 focus:ring-red-100{% endif %}" name="content" required maxlength="280" data-post-content="true">{{ post_text }}</textarea>
+        <span class="mt-2 flex items-center justify-between gap-3 text-sm">
+            <span class="font-semibold text-red-600" data-post-error="true">{{ errors.content or "" }}</span>
+            <span class="text-slate-500" data-post-counter="true">{{ post_text|length }}/280</span>
+        </span>
+    </label>
+    <div class="flex flex-wrap gap-3">
+        <button class="rounded-full bg-sky-500 px-5 py-2 font-semibold text-white hover:bg-sky-600 disabled:cursor-not-allowed disabled:bg-slate-300" type="submit" data-post-submit="true">Сохранить</button>
+        <a class="rounded-full border border-slate-300 px-5 py-2 font-semibold hover:bg-slate-100" href="{{ next or '/users/' ~ current_user.username }}" data-post-back="true">Отмена</a>
+    </div>
+</form>
+
+<script>
+    document.querySelectorAll("[data-post-form]").forEach((form) => {
+        const textarea = form.querySelector("[data-post-content]");
+        const counter = form.querySelector("[data-post-counter]");
+        const error = form.querySelector("[data-post-error]");
+        const submit = form.querySelector("[data-post-submit]");
+
+        function updatePostForm() {
+            const length = textarea.value.length;
+            const isBlank = textarea.value.trim().length === 0;
+            counter.textContent = `${length}/280`;
+            counter.className = length > 280 ? "text-red-600" : "text-slate-500";
+            submit.disabled = isBlank || length > 280;
+            if (!isBlank && error.textContent === "Поле не может быть пустым") {
+                error.textContent = "";
+            }
+        }
+
+        textarea.addEventListener("input", updatePostForm);
+        updatePostForm();
+    });
+</script>
+{% endblock %}

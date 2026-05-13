@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+
+{% block content %}
+<section class="space-y-5">
+    <header class="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+        <div class="h-28 {% if is_own_profile %}bg-sky-100{% else %}bg-slate-100{% endif %}"></div>
+        <div class="px-5 pb-5">
+            <div class="-mt-10 flex items-end justify-between gap-4">
+                {% if user.avatar_url %}
+                <img class="h-24 w-24 rounded-full border-4 border-white object-cover" src="{{ user.avatar_url }}" alt="{{ user.username }}">
+                {% else %}
+                <div class="flex h-24 w-24 items-center justify-center rounded-full border-4 border-white bg-slate-950 text-3xl font-black uppercase text-white">
+                    {{ user.username[0] }}
+                </div>
+                {% endif %}
+
+                {% if is_own_profile %}
+                <a href="/profile/edit" class="mb-2 rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold hover:bg-slate-100">Редактировать профиль</a>
+                {% else %}
+                    {% if current_user %}
+                        {% if is_subscribed %}
+                        <form method="post" action="/users/{{ user.id }}/unsubscribe" class="mb-2" data-subscription-form data-user-id="{{ user.id }}">
+                            <input type="hidden" name="next" value="{{ request.url.path }}">
+                            <button type="submit" class="rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold hover:bg-slate-100" data-subscription-button data-subscribed="true">Отписаться</button>
+                        </form>
+                        {% else %}
+                        <form method="post" action="/users/{{ user.id }}/subscribe" class="mb-2" data-subscription-form data-user-id="{{ user.id }}">
+                            <input type="hidden" name="next" value="{{ request.url.path }}">
+                            <button type="submit" class="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800" data-subscription-button data-subscribed="false">Подписаться</button>
+                        </form>
+                        {% endif %}
+                    {% else %}
+                    <a href="/login?next={{ request.url.path }}" class="mb-2 rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800">Подписаться</a>
+                    {% endif %}
+                {% endif %}
+            </div>
+
+            <div class="mt-4">
+                <p class="break-words text-2xl font-black">{{ user.username }}</p>
+                <p class="mt-3 whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-[15px] leading-6 text-slate-800">{{ user.bio or "Описание пока не заполнено" }}</p>
+                <p class="mt-3 text-sm text-slate-500">Дата регистрации: {{ user.created_at.strftime("%d.%m.%y") }}</p>
+            </div>
+
+            {% if is_own_profile %}
+            <dl class="mt-4 grid gap-3 text-sm sm:grid-cols-2">
+                <div>
+                    <dt class="font-semibold text-slate-500">Email</dt>
+                    <dd class="break-all">{{ user.email }}</dd>
+                </div>
+
+            </dl>
+            {% endif %}
+
+            <div class="mt-4 flex flex-wrap gap-5 text-sm">
+                {% if user.is_followers_public or is_own_profile %}
+                    {% if current_user %}
+                    <a class="hover:underline" href="/users/{{ user.username }}/followers">
+                    {% else %}
+                    <a class="hover:underline" href="/login?next=/users/{{ user.username }}/followers">
+                    {% endif %}
+                        <span class="font-bold" data-followers-count="{{ user.id }}">{{ followers_count }}</span>
+                        <span class="text-slate-500">подписчиков</span>
+                    </a>
+                {% endif %}
+
+                {% if user.is_following_public or is_own_profile %}
+                    {% if current_user %}
+                    <a class="hover:underline" href="/users/{{ user.username }}/following">
+                    {% else %}
+                    <a class="hover:underline" href="/login?next=/users/{{ user.username }}/following">
+                    {% endif %}
+                        <span class="font-bold">{{ following_count }}</span>
+                        <span class="text-slate-500">подписок</span>
+                    </a>
+                {% endif %}
+            </div>
+
+            {% if is_own_profile %}
+            <div class="mt-4 grid gap-2 text-xs font-semibold text-slate-600 sm:grid-cols-2">
+                <div class="rounded-xl bg-slate-50 px-3 py-2">
+                    Список подписчиков: {{ "публичный" if user.is_followers_public else "приватный" }}
+                </div>
+                <div class="rounded-xl bg-slate-50 px-3 py-2">
+                    Список подписок: {{ "публичный" if user.is_following_public else "приватный" }}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </header>
+
+    <div class="flex items-center justify-between">
+        <h2 class="text-lg font-bold">{{ "Мои посты" if is_own_profile else "Посты" }}</h2>
+        {% if is_own_profile %}
+        <a href="/posts/create" class="rounded-full bg-sky-500 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-600">Новый пост</a>
+        {% endif %}
+    </div>
+
+    {% if post_cards %}
+    <ul class="divide-y divide-slate-200 border-y border-slate-200">
+        {% for card in post_cards %}
+        <li class="py-4">
+            {% set show_author = false %}
+            {% set show_actions = true %}
+            {% include "_post_card.html" %}
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <p class="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-8 text-center text-slate-500">Постов пока нет.</p>
+    {% endif %}
+</section>
+{% endblock %}

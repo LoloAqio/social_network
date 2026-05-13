@@ -1,0 +1,262 @@
+{% extends "base.html" %}
+
+{% block content %}
+<form method="get" action="/search" class="flex gap-2" data-search-form>
+    <label class="sr-only" for="q">Поиск</label>
+    <input
+        id="q"
+        class="min-w-0 flex-1 rounded-full border border-slate-300 px-4 py-2 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
+        type="search"
+        name="q"
+        value="{{ q }}"
+        maxlength="100"
+        placeholder="Поиск пользователей по username"
+        autocomplete="off"
+        autofocus
+        data-search-input
+    >
+    <button class="rounded-full bg-sky-500 px-5 py-2 font-semibold text-white hover:bg-sky-600" type="submit">Найти</button>
+    <a class="rounded-full border border-slate-300 px-4 py-2 font-semibold hover:bg-slate-100 {% if not q %}hidden{% endif %}" href="/search" data-search-clear>Очистить</a>
+</form>
+
+<h2 class="mt-6 text-lg font-bold {% if not q %}hidden{% endif %}" data-search-title>Пользователи</h2>
+
+<ul class="mt-3 divide-y divide-slate-200 border-y border-slate-200 {% if not q or not users %}hidden{% endif %}" data-search-results>
+    {% for user in users %}
+    <li class="flex items-center justify-between gap-4 py-4">
+        <div class="flex min-w-0 items-center gap-3">
+            {% if user.avatar_url %}
+            <img class="h-11 w-11 shrink-0 rounded-full object-cover" src="{{ user.avatar_url }}" alt="{{ user.username }}">
+            {% else %}
+            <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-slate-950 font-black uppercase text-white">{{ user.username[0] }}</span>
+            {% endif %}
+            <div class="min-w-0">
+                <p class="break-all font-bold">{{ user.username }}</p>
+                {% if user.first_name or user.last_name %}
+                <p class="break-words text-sm text-slate-500">{{ user.first_name or "" }} {{ user.last_name or "" }}</p>
+                {% endif %}
+            </div>
+        </div>
+        <a class="shrink-0 rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold hover:bg-slate-100" href="/users/{{ user.username }}" data-profile-link>Открыть</a>
+    </li>
+    {% endfor %}
+</ul>
+
+<a
+    class="mt-4 rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold hover:bg-slate-100 {% if has_more %}inline-flex{% else %}hidden{% endif %}"
+    href="/search?q={{ q }}&offset={{ next_offset }}"
+    data-search-more
+    data-next-offset="{{ next_offset }}"
+    data-query="{{ q }}"
+>Ещё</a>
+
+<p class="mt-6 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-8 text-center text-slate-500 {% if q or users %}hidden{% endif %}" data-search-start>
+    Введите username, чтобы найти пользователя.
+</p>
+<p class="mt-6 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-8 text-center text-slate-500 hidden" data-search-loading>
+    Поиск...
+</p>
+<p class="mt-6 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-8 text-center text-slate-500 {% if not q or users %}hidden{% endif %}" data-search-empty>
+    Пользователи не найдены.
+</p>
+
+<script>
+    (() => {
+        const form = document.querySelector("[data-search-form]");
+        const input = document.querySelector("[data-search-input]");
+        const clearButton = document.querySelector("[data-search-clear]");
+        const title = document.querySelector("[data-search-title]");
+        const resultsList = document.querySelector("[data-search-results]");
+        const moreButton = document.querySelector("[data-search-more]");
+        const startMessage = document.querySelector("[data-search-start]");
+        const loadingMessage = document.querySelector("[data-search-loading]");
+        const emptyMessage = document.querySelector("[data-search-empty]");
+
+        if (!form || !input || !resultsList || !moreButton) {
+            return;
+        }
+
+        let debounceTimer = null;
+        let controller = null;
+        let requestNumber = 0;
+
+        const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (char) => ({
+            "&": "&amp;",
+            "<": "&lt;",
+            ">": "&gt;",
+            "\"": "&quot;",
+            "'": "&#039;",
+        }[char]));
+
+        const renderUser = (user) => {
+            const firstName = user.first_name || "";
+            const lastName = user.last_name || "";
+            const fullName = `${firstName} ${lastName}`.trim();
+            const avatar = user.avatar_url
+                ? `<img class="h-11 w-11 shrink-0 rounded-full object-cover" src="${escapeHtml(user.avatar_url)}" alt="${escapeHtml(user.username)}">`
+                : `<span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-slate-950 font-black uppercase text-white">${escapeHtml(user.username[0] || "?")}</span>`;
+            const nameLine = fullName
+                ? `<p class="break-words text-sm text-slate-500">${escapeHtml(fullName)}</p>`
+                : "";
+
+            return `
+                <li class="flex items-center justify-between gap-4 py-4">
+                    <div class="flex min-w-0 items-center gap-3">
+                        ${avatar}
+                        <div class="min-w-0">
+                            <p class="break-all font-bold">${escapeHtml(user.username)}</p>
+                            ${nameLine}
+                        </div>
+                    </div>
+                    <a class="shrink-0 rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold hover:bg-slate-100" href="/users/${encodeURIComponent(user.username)}" data-profile-link>Открыть</a>
+                </li>
+            `;
+        };
+
+        const updateUrl = (query) => {
+            const nextUrl = query ? `/search?q=${encodeURIComponent(query)}` : "/search";
+            window.history.replaceState({}, "", nextUrl);
+        };
+
+        const setLoading = (query) => {
+            title.classList.toggle("hidden", query.length === 0);
+            clearButton.classList.toggle("hidden", query.length === 0);
+            startMessage.classList.add("hidden");
+            emptyMessage.classList.add("hidden");
+            loadingMessage.classList.remove("hidden");
+            moreButton.classList.add("hidden");
+            moreButton.classList.remove("inline-flex");
+        };
+
+        const renderState = ({query, users, hasMore, nextOffset, append = false}) => {
+            const hasQuery = query.length > 0;
+            const hasUsers = users.length > 0 || (append && resultsList.children.length > 0);
+
+            title.classList.toggle("hidden", !hasQuery);
+            clearButton.classList.toggle("hidden", !hasQuery);
+            startMessage.classList.toggle("hidden", hasQuery);
+            loadingMessage.classList.add("hidden");
+            emptyMessage.classList.toggle("hidden", !hasQuery || hasUsers);
+
+            if (append) {
+                resultsList.insertAdjacentHTML("beforeend", users.map(renderUser).join(""));
+            } else {
+                resultsList.innerHTML = users.map(renderUser).join("");
+            }
+
+            resultsList.classList.toggle("hidden", resultsList.children.length === 0);
+
+            if (hasMore) {
+                moreButton.classList.remove("hidden");
+                moreButton.classList.add("inline-flex");
+                moreButton.dataset.query = query;
+                moreButton.dataset.nextOffset = nextOffset;
+                moreButton.href = `/search?q=${encodeURIComponent(query)}&offset=${encodeURIComponent(nextOffset)}`;
+                moreButton.textContent = "Ещё";
+            } else {
+                moreButton.classList.add("hidden");
+                moreButton.classList.remove("inline-flex");
+            }
+        };
+
+        const fetchUsers = async (query, offset = 0) => {
+            if (controller) {
+                controller.abort();
+            }
+            controller = new AbortController();
+            const response = await fetch(`/search?q=${encodeURIComponent(query)}&offset=${encodeURIComponent(offset)}`, {
+                headers: {
+                    "X-Requested-With": "XMLHttpRequest",
+                },
+                signal: controller.signal,
+            });
+
+            if (!response.ok) {
+                throw new Error("Search request failed");
+            }
+
+            return response.json();
+        };
+
+        const runSearch = async () => {
+            const query = input.value.trim();
+            requestNumber += 1;
+            const currentRequest = requestNumber;
+            updateUrl(query);
+
+            if (!query) {
+                if (controller) {
+                    controller.abort();
+                }
+                renderState({query: "", users: [], hasMore: false, nextOffset: 0});
+                return;
+            }
+
+            setLoading(query);
+
+            try {
+                const result = await fetchUsers(query);
+                if (currentRequest !== requestNumber) {
+                    return;
+                }
+                renderState({
+                    query,
+                    users: result.users,
+                    hasMore: result.has_more,
+                    nextOffset: result.next_offset,
+                });
+            } catch (error) {
+                if (error.name !== "AbortError") {
+                    form.submit();
+                }
+            }
+        };
+
+        input.addEventListener("input", () => {
+            window.clearTimeout(debounceTimer);
+            debounceTimer = window.setTimeout(runSearch, 400);
+        });
+
+        moreButton.addEventListener("click", async (event) => {
+            event.preventDefault();
+            const query = moreButton.dataset.query || input.value.trim();
+            const offset = moreButton.dataset.nextOffset || "0";
+
+            if (!query) {
+                return;
+            }
+
+            moreButton.textContent = "Загрузка...";
+            moreButton.classList.add("pointer-events-none", "opacity-60");
+
+            try {
+                const result = await fetchUsers(query, offset);
+                renderState({
+                    query,
+                    users: result.users,
+                    hasMore: result.has_more,
+                    nextOffset: result.next_offset,
+                    append: true,
+                });
+            } catch (error) {
+                if (error.name !== "AbortError") {
+                    window.location.href = moreButton.href;
+                }
+            } finally {
+                moreButton.classList.remove("pointer-events-none", "opacity-60");
+            }
+        });
+
+        clearButton.addEventListener("click", (event) => {
+            event.preventDefault();
+            input.value = "";
+            updateUrl("");
+            if (controller) {
+                controller.abort();
+            }
+            renderState({query: "", users: [], hasMore: false, nextOffset: 0});
+            input.focus();
+        });
+    })();
+</script>
+{% endblock %}

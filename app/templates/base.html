@@ -1,0 +1,347 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ title | default("Соцсеть") }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}">
+</head>
+<body class="bg-slate-50 text-slate-950 antialiased">
+    {% if request is defined and request.state.current_user is defined %}
+        {% set nav_user = request.state.current_user %}
+    {% elif current_user is defined %}
+        {% set nav_user = current_user %}
+    {% elif user is defined %}
+        {% set nav_user = user %}
+    {% else %}
+        {% set nav_user = none %}
+    {% endif %}
+    <div class="mx-auto min-h-screen max-w-6xl border-x border-slate-200 bg-white lg:grid lg:grid-cols-[240px_minmax(0,1fr)]">
+        <aside class="sticky top-0 z-10 border-b border-slate-200 bg-white/95 px-4 py-2 backdrop-blur lg:h-screen lg:border-b-0 lg:border-r lg:px-5 lg:py-4">
+            <div class="flex items-center justify-between gap-4 lg:block">
+                <a href="/feed" class="text-xl px-4 font-black tracking-tight text-sky-600">Соцсеть</a>
+
+                <nav class="flex items-center gap-2 overflow-x-auto text-sm font-semibold lg:mt-8 lg:block lg:space-y-2">
+                    <a href="/feed" class="block rounded-full px-4 py-2 text-slate-800 hover:bg-slate-100">Лента</a>
+                    {% if nav_user %}
+                    <a href="/following-feed" class="block rounded-full px-4 py-2 text-slate-800 hover:bg-slate-100">Подписки</a>
+                    {% endif %}
+                    <a href="/search" class="block rounded-full px-4 py-2 text-slate-800 hover:bg-slate-100">Поиск</a>
+                    {% if nav_user %}
+                    <a href="/profile" class="block rounded-full px-4 py-2 text-slate-800 hover:bg-slate-100" data-profile-link="true">Профиль</a>
+                    <a href="/posts/create" class="block rounded-full bg-sky-500 px-4 py-2 text-center text-white hover:bg-sky-600">Новый пост</a>
+                    {% else %}
+                    <a href="/login" class="block rounded-full px-4 py-2 text-slate-800 hover:bg-slate-100">Вход</a>
+                    <a href="/register" class="block rounded-full bg-sky-500 px-4 py-2 text-center text-white hover:bg-sky-600">Регистрация</a>
+                    {% endif %}
+                </nav>
+            </div>
+
+            {% if nav_user %}
+            <form method="post" action="/logout" class="mt-4 hidden lg:block">
+                <button type="submit" class="w-full rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100">Выйти</button>
+            </form>
+            {% endif %}
+        </aside>
+
+        <main class="min-w-0">
+            <div class="border-b border-slate-200 bg-white/95 px-4 py-4 backdrop-blur sm:px-6">
+                <div class="flex items-center gap-3">
+                    {% if show_profile_back is defined and show_profile_back %}
+                    <a href="/feed" class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xl font-black leading-none text-slate-900 hover:bg-slate-100" aria-label="Назад" data-profile-back="true">&lt;</a>
+                    {% elif show_post_back is defined and show_post_back %}
+                    <a href="{{ post_back_href | default('/feed') }}" class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xl font-black leading-none text-slate-900 hover:bg-slate-100" aria-label="Назад" data-post-back="true">&lt;</a>
+                    {% endif %}
+                    <h1 class="min-w-0 break-words text-xl font-extrabold tracking-tight">{{ page_heading | default(title | default("Лента")) }}</h1>
+                </div>
+            </div>
+
+            <section class="mx-auto max-w-2xl px-4 py-5 sm:px-6">
+                {% block content %}{% endblock %}
+            </section>
+        </main>
+    </div>
+    <script>
+        const inactiveReactionClass = "flex min-w-12 flex-col items-center rounded-2xl border border-slate-200 bg-white/80 px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-white";
+        const ownActiveReactionClass = "flex min-w-12 flex-col items-center rounded-2xl border border-sky-500 bg-white px-3 py-2 text-sm font-semibold text-sky-700";
+        const activeReactionClass = "flex min-w-12 flex-col items-center rounded-2xl border border-sky-100 bg-sky-50 px-3 py-2 text-sm font-semibold text-sky-700 shadow-sm";
+        const subscribeButtonClass = "rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800";
+        const unsubscribeButtonClass = "rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold hover:bg-slate-100";
+        const postReturnUrlKey = "post-return-url";
+        const postReturnScrollKey = "post-return-scroll-y";
+        const profileReturnUrlKey = "profile-return-url";
+        const profileReturnScrollKey = "profile-return-scroll-y";
+
+        function updateReactionCard(card, result) {
+            const isOwnPost = card.dataset.ownPost === "true";
+
+            card.querySelectorAll("[data-reaction-count]").forEach((counter) => {
+                const reactionType = counter.dataset.reactionCount;
+                counter.textContent = result.reaction_counts[reactionType] ?? 0;
+            });
+
+            card.querySelectorAll("[data-reaction-button]").forEach((button) => {
+                const isActive = button.dataset.reactionButton === result.current_user_reaction;
+                if (!isActive) {
+                    button.className = inactiveReactionClass;
+                    return;
+                }
+
+                button.className = isOwnPost ? ownActiveReactionClass : activeReactionClass;
+            });
+        }
+
+        function updateSubscriptionForm(form, result) {
+            const userId = form.dataset.userId;
+            const button = form.querySelector("[data-subscription-button]");
+
+            if (!userId || !button) {
+                return;
+            }
+
+            if (result.is_subscribed) {
+                form.action = `/users/${userId}/unsubscribe`;
+                button.textContent = "Отписаться";
+                button.dataset.subscribed = "true";
+                button.className = unsubscribeButtonClass;
+            } else {
+                form.action = `/users/${userId}/subscribe`;
+                button.textContent = "Подписаться";
+                button.dataset.subscribed = "false";
+                button.className = subscribeButtonClass;
+            }
+
+            document.querySelectorAll(`[data-followers-count="${userId}"]`).forEach((counter) => {
+                counter.textContent = result.followers_count;
+            });
+        }
+
+        function showDeleteConfirm(card) {
+            const content = card.querySelector("[data-post-content-block]");
+            const confirm = card.querySelector("[data-delete-confirm]");
+            if (!content || !confirm) {
+                return;
+            }
+
+            content.classList.add("hidden");
+            confirm.classList.remove("hidden");
+            confirm.classList.add("grid");
+        }
+
+        function hideDeleteConfirm(card) {
+            const content = card.querySelector("[data-post-content-block]");
+            const confirm = card.querySelector("[data-delete-confirm]");
+            if (!content || !confirm) {
+                return;
+            }
+
+            confirm.classList.add("hidden");
+            confirm.classList.remove("grid");
+            content.classList.remove("hidden");
+        }
+
+        function showDeletedPost(card) {
+            card.className = "rounded-2xl border border-slate-200 bg-slate-50 p-6 text-center";
+            card.innerHTML = '<p class="font-bold text-slate-500">Пост удален</p>';
+        }
+
+        function restorePostReturnScroll() {
+            const returnUrl = sessionStorage.getItem(postReturnUrlKey);
+            const scrollY = sessionStorage.getItem(postReturnScrollKey);
+            const currentUrl = `${window.location.pathname}${window.location.search}`;
+
+            if (returnUrl !== currentUrl || scrollY === null) {
+                return;
+            }
+
+            sessionStorage.removeItem(postReturnUrlKey);
+            sessionStorage.removeItem(postReturnScrollKey);
+            requestAnimationFrame(() => window.scrollTo(0, Number(scrollY)));
+        }
+
+        function restoreProfileReturnScroll() {
+            const returnUrl = sessionStorage.getItem(profileReturnUrlKey);
+            const scrollY = sessionStorage.getItem(profileReturnScrollKey);
+            const currentUrl = `${window.location.pathname}${window.location.search}`;
+
+            if (returnUrl !== currentUrl || scrollY === null) {
+                return;
+            }
+
+            sessionStorage.removeItem(profileReturnUrlKey);
+            sessionStorage.removeItem(profileReturnScrollKey);
+            requestAnimationFrame(() => window.scrollTo(0, Number(scrollY)));
+        }
+
+        document.addEventListener("click", (event) => {
+            const deleteShowButton = event.target.closest("[data-delete-show]");
+            if (deleteShowButton) {
+                const card = deleteShowButton.closest("[data-post-card]");
+                if (card) {
+                    showDeleteConfirm(card);
+                }
+                return;
+            }
+
+            const deleteCancelButton = event.target.closest("[data-delete-cancel]");
+            if (deleteCancelButton) {
+                const card = deleteCancelButton.closest("[data-post-card]");
+                if (card) {
+                    hideDeleteConfirm(card);
+                }
+                return;
+            }
+
+            const postReturnLink = event.target.closest("[data-post-return-link]");
+            if (postReturnLink) {
+                sessionStorage.setItem(postReturnUrlKey, `${window.location.pathname}${window.location.search}`);
+                sessionStorage.setItem(postReturnScrollKey, String(window.scrollY));
+                return;
+            }
+
+            const postBackLink = event.target.closest("[data-post-back]");
+            if (postBackLink) {
+                const returnUrl = sessionStorage.getItem(postReturnUrlKey) || postBackLink.getAttribute("href") || "/feed";
+                event.preventDefault();
+                window.location.href = returnUrl;
+                return;
+            }
+
+            const profileBackLink = event.target.closest("[data-profile-back]");
+            if (profileBackLink) {
+                const returnUrl = sessionStorage.getItem(profileReturnUrlKey) || profileBackLink.getAttribute("href") || "/feed";
+                event.preventDefault();
+                window.location.href = returnUrl;
+                return;
+            }
+
+            const profileLink = event.target.closest("[data-profile-link]");
+            if (profileLink) {
+                const targetUrl = new URL(profileLink.getAttribute("href"), window.location.origin);
+                const currentUrl = `${window.location.pathname}${window.location.search}`;
+                const targetPath = `${targetUrl.pathname}${targetUrl.search}`;
+                if (targetPath !== currentUrl) {
+                    sessionStorage.setItem(profileReturnUrlKey, currentUrl);
+                    sessionStorage.setItem(profileReturnScrollKey, String(window.scrollY));
+                }
+            }
+        });
+
+        document.addEventListener("submit", async (event) => {
+            const form = event.target;
+            if (form instanceof HTMLFormElement && form.dataset.subscriptionForm !== undefined) {
+                event.preventDefault();
+                const submitButton = form.querySelector("button[type='submit']");
+                const originalText = submitButton ? submitButton.textContent : "";
+
+                if (submitButton) {
+                    submitButton.disabled = true;
+                    submitButton.textContent = "Сохранение...";
+                }
+
+                try {
+                    const response = await fetch(form.action, {
+                        method: "POST",
+                        body: new FormData(form),
+                        headers: {
+                            "X-Requested-With": "XMLHttpRequest",
+                        },
+                    });
+
+                    if (!response.ok) {
+                        throw new Error("Subscription request failed");
+                    }
+
+                    const result = await response.json();
+                    updateSubscriptionForm(form, result);
+                } catch (error) {
+                    form.submit();
+                } finally {
+                    if (submitButton) {
+                        submitButton.disabled = false;
+                        if (submitButton.textContent === "Сохранение...") {
+                            submitButton.textContent = originalText;
+                        }
+                    }
+                }
+                return;
+            }
+
+            if (form instanceof HTMLFormElement && form.dataset.deleteForm === "true") {
+                event.preventDefault();
+                const card = form.closest("[data-post-card]");
+                const submitButton = form.querySelector("button[type='submit']");
+
+                if (submitButton) {
+                    submitButton.disabled = true;
+                    submitButton.textContent = "Удаление...";
+                }
+
+                try {
+                    const response = await fetch(form.action, {
+                        method: "POST",
+                        body: new FormData(form),
+                        headers: {
+                            "X-Requested-With": "XMLHttpRequest",
+                        },
+                    });
+
+                    if (!response.ok) {
+                        throw new Error("Delete request failed");
+                    }
+
+                    if (card) {
+                        showDeletedPost(card);
+                    }
+                } catch (error) {
+                    form.submit();
+                }
+                return;
+            }
+
+            if (!(form instanceof HTMLFormElement) || form.dataset.reactionForm !== "true") {
+                return;
+            }
+
+            event.preventDefault();
+            const card = form.closest("[data-post-card]");
+            const submitButton = form.querySelector("button[type='submit']");
+
+            if (submitButton) {
+                submitButton.disabled = true;
+            }
+
+            try {
+                const response = await fetch(form.action, {
+                    method: "POST",
+                    body: new FormData(form),
+                    headers: {
+                        "X-Requested-With": "XMLHttpRequest",
+                    },
+                });
+
+                if (!response.ok) {
+                    throw new Error("Reaction request failed");
+                }
+
+                const result = await response.json();
+                if (card) {
+                    updateReactionCard(card, result);
+                }
+            } catch (error) {
+                form.submit();
+            } finally {
+                if (submitButton) {
+                    submitButton.disabled = false;
+                }
+            }
+        });
+
+        window.addEventListener("load", () => {
+            restorePostReturnScroll();
+            restoreProfileReturnScroll();
+        });
+    </script>
+</body>
+</html>

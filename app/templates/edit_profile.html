@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+
+{% block content %}
+{% set input_class = "w-full rounded-full border border-slate-300 px-4 py-2 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100" %}
+{% set error_class = "mt-1 text-sm font-semibold text-red-600" %}
+{% set hint_class = "mt-1 text-xs text-slate-500" %}
+{% set avatar_url_value = form_data.avatar_url if form_data.avatar_url is defined else user.avatar_url or "" %}
+{% set followers_public_value = form_data.is_followers_public if form_data.is_followers_public is defined else user.is_followers_public %}
+{% set following_public_value = form_data.is_following_public if form_data.is_following_public is defined else user.is_following_public %}
+
+<form method="post" action="/profile/edit" class="space-y-4" novalidate>
+    <div class="flex items-center gap-4 rounded-2xl border border-slate-200 p-4">
+        <img id="avatar-preview" class="h-16 w-16 rounded-full object-cover {% if not avatar_url_value %}hidden{% endif %}" src="{{ avatar_url_value }}" alt="Avatar preview">
+        <div id="avatar-fallback" class="flex h-16 w-16 items-center justify-center rounded-full bg-slate-950 text-xl font-black uppercase text-white {% if avatar_url_value %}hidden{% endif %}">
+            {{ user.username[0] }}
+        </div>
+        <div>
+            <p class="font-bold">Аватар</p>
+            <p class="{{ hint_class }}">Вставьте ссылку на изображение ниже, чтобы увидеть предпросмотр.</p>
+        </div>
+    </div>
+
+    <label class="block">
+        <span class="mb-2 block text-sm font-semibold text-slate-700">Username</span>
+        <input class="{{ input_class }} {% if errors.username %}border-red-300 focus:border-red-500 focus:ring-red-100{% endif %}" type="text" name="username" value="{{ form_data.username or user.username }}" required minlength="3" maxlength="50">
+        <p class="{{ hint_class }}">Минимум 3 символа, без пробелов.</p>
+        {% if errors.username %}<p class="{{ error_class }}">{{ errors.username }}</p>{% endif %}
+    </label>
+    <label class="block">
+        <span class="mb-2 block text-sm font-semibold text-slate-700">Email</span>
+        <input class="{{ input_class }} {% if errors.email %}border-red-300 focus:border-red-500 focus:ring-red-100{% endif %}" type="email" name="email" value="{{ form_data.email or user.email }}" required maxlength="255" pattern="^[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}$">
+        <p class="{{ hint_class }}">Формат: name@example.com.</p>
+        {% if errors.email %}<p class="{{ error_class }}">{{ errors.email }}</p>{% endif %}
+    </label>
+    <label class="block">
+        <span class="mb-2 block text-sm font-semibold text-slate-700">Имя <span class="font-normal text-slate-500">(необязательно)</span></span>
+        <input class="{{ input_class }} {% if errors.first_name %}border-red-300 focus:border-red-500 focus:ring-red-100{% endif %}" type="text" name="first_name" value="{{ form_data.first_name if form_data.first_name is defined else user.first_name or '' }}" maxlength="100">
+        {% if errors.first_name %}<p class="{{ error_class }}">{{ errors.first_name }}</p>{% endif %}
+    </label>
+    <label class="block">
+        <span class="mb-2 block text-sm font-semibold text-slate-700">Фамилия <span class="font-normal text-slate-500">(необязательно)</span></span>
+        <input class="{{ input_class }} {% if errors.last_name %}border-red-300 focus:border-red-500 focus:ring-red-100{% endif %}" type="text" name="last_name" value="{{ form_data.last_name if form_data.last_name is defined else user.last_name or '' }}" maxlength="100">
+        {% if errors.last_name %}<p class="{{ error_class }}">{{ errors.last_name }}</p>{% endif %}
+    </label>
+    <label class="block">
+        <span class="mb-2 block text-sm font-semibold text-slate-700">О себе <span class="font-normal text-slate-500">(необязательно)</span></span>
+        {% set bio_text = form_data.bio if form_data.bio is defined else user.bio or '' %}
+        <textarea class="min-h-28 w-full resize-y rounded-2xl border border-slate-300 px-4 py-3 outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100 {% if errors.bio %}border-red-300 focus:border-red-500 focus:ring-red-100{% endif %}" name="bio" maxlength="500" data-bio-input="true">{{ bio_text }}</textarea>
+        <span class="mt-2 flex items-center justify-between gap-3 text-sm">
+            <span class="font-semibold text-red-600">{{ errors.bio or "" }}</span>
+            <span class="text-slate-500" data-bio-counter="true">{{ bio_text|length }}/500</span>
+        </span>
+    </label>
+    <label class="block">
+        <span class="mb-2 block text-sm font-semibold text-slate-700">Ссылка на аватар <span class="font-normal text-slate-500">(необязательно)</span></span>
+        <input id="avatar-url-input" class="{{ input_class }} {% if errors.avatar_url %}border-red-300 focus:border-red-500 focus:ring-red-100{% endif %}" type="url" name="avatar_url" value="{{ avatar_url_value }}" maxlength="500">
+        <p class="{{ hint_class }}">Можно оставить пустым.</p>
+        {% if errors.avatar_url %}<p class="{{ error_class }}">{{ errors.avatar_url }}</p>{% endif %}
+    </label>
+
+    <fieldset class="space-y-3 rounded-2xl border border-slate-200 p-4">
+        <legend class="px-1 text-sm font-bold text-slate-700">Приватность подписок</legend>
+        <label class="flex items-start gap-3">
+            <input class="mt-1 h-4 w-4 rounded border-slate-300 text-sky-500" type="checkbox" name="is_followers_public" value="true" {% if followers_public_value %}checked{% endif %}>
+            <span>
+                <span class="block text-sm font-semibold">Показывать подписчиков публично</span>
+                <span class="block text-xs text-slate-500">Другие пользователи смогут видеть количество подписчиков и открывать список.</span>
+            </span>
+        </label>
+        <label class="flex items-start gap-3">
+            <input class="mt-1 h-4 w-4 rounded border-slate-300 text-sky-500" type="checkbox" name="is_following_public" value="true" {% if following_public_value %}checked{% endif %}>
+            <span>
+                <span class="block text-sm font-semibold">Показывать подписки публично</span>
+                <span class="block text-xs text-slate-500">Другие пользователи смогут видеть количество подписок и открывать список.</span>
+            </span>
+        </label>
+    </fieldset>
+    <button class="rounded-full bg-sky-500 px-5 py-2 font-semibold text-white hover:bg-sky-600" type="submit">Сохранить</button>
+</form>
+
+<a class="mt-5 inline-flex rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold hover:bg-slate-100" href="/profile">Вернуться к профилю</a>
+
+<script>
+    const avatarInput = document.querySelector("#avatar-url-input");
+    const avatarPreview = document.querySelector("#avatar-preview");
+    const avatarFallback = document.querySelector("#avatar-fallback");
+    const bioInput = document.querySelector("[data-bio-input]");
+    const bioCounter = document.querySelector("[data-bio-counter]");
+
+    function updateAvatarPreview() {
+        const value = avatarInput.value.trim();
+        if (!value) {
+            avatarPreview.classList.add("hidden");
+            avatarFallback.classList.remove("hidden");
+            return;
+        }
+
+        avatarPreview.src = value;
+        avatarPreview.classList.remove("hidden");
+        avatarFallback.classList.add("hidden");
+    }
+
+    function updateBioCounter() {
+        const length = bioInput.value.length;
+        bioCounter.textContent = `${length}/500`;
+        bioCounter.className = length > 500 ? "text-red-600" : "text-slate-500";
+    }
+
+    avatarInput.addEventListener("input", updateAvatarPreview);
+    avatarPreview.addEventListener("error", () => {
+        avatarPreview.classList.add("hidden");
+        avatarFallback.classList.remove("hidden");
+    });
+    bioInput.addEventListener("input", updateBioCounter);
+    updateAvatarPreview();
+    updateBioCounter();
+</script>
+{% endblock %}
