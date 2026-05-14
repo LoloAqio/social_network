@@ -32,9 +32,6 @@
             {% endif %}
             <div class="min-w-0">
                 <p class="break-all font-bold">{{ user.username }}</p>
-                {% if user.first_name or user.last_name %}
-                <p class="break-words text-sm text-slate-500">{{ user.first_name or "" }} {{ user.last_name or "" }}</p>
-                {% endif %}
             </div>
         </div>
         <a class="shrink-0 rounded-full border border-slate-300 px-4 py-2 text-sm font-semibold hover:bg-slate-100" href="/users/{{ user.username }}" data-profile-link>Открыть</a>

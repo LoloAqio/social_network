@@ -6,6 +6,7 @@
     <title>{{ title | default("Соцсеть") }}</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}">
+    <link rel="icon" type="image/png" href="{{ url_for('static', path='favicon.png') }}">
 </head>
 <body class="bg-slate-50 text-slate-950 antialiased">
     {% if request is defined and request.state.current_user is defined %}

@@ -47,8 +47,7 @@ async def search_page(
                 "users": [
                     {
                         "username": user.username,
-                        "first_name": user.first_name,
-                        "last_name": user.last_name,
+
                         "avatar_url": user.avatar_url,
                     }
                     for user in users
